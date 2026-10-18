@@ -1,0 +1,20 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.DS_Store
+*_load_report.json
+load_report.json
+# Only the explicitly named synthetic fixtures belong in this package.
+data/*.json
+data/*.jsonl
+!data/synthetic_books.jsonl
+!data/synthetic_sports.jsonl
+*.sql.gz
+*.dump
+__MACOSX/
+._*
