@@ -1,11 +1,23 @@
 # Amazon review databases
 
-A university project exploring relational, document and graph representations of
-review data. It loads structured fields into MySQL, review text into MongoDB,
+Explore relational, document and graph representations of review data with a
+Python loading and analysis pipeline. It loads structured fields into MySQL, review text into MongoDB,
 offers seven visualisations and builds four alternative Neo4j graphs. A popularity
 query recommends products a user has not reviewed, ranked by review count, mean
 rating and product ID. It is an aggregation baseline, not a trained recommender;
 an unreviewed product is not necessarily unpurchased.
+
+![Rating distribution produced by the existing plotting code from the twelve-event synthetic fixture](docs/images/synthetic-ratings.png)
+
+An offline run of the bundled fictitious reviews through the existing loader and
+rating plot: 12 events, including 11 ratings and one missing rating. It uses the
+test suite's SQLite adapter and document-list double, without external database
+services. Reproduce with `python preview.py` after installing the requirements.
+
+**Technical focus:** event-preserving data modelling, validation and partial-write
+reporting, SQL aggregation, document storage and graph similarity. Python,
+PyMySQL, PyMongo, the Neo4j driver and Matplotlib; detailed service instructions
+are in [Database usage](docs/database-usage.md).
 
 ## Try it without databases
 
