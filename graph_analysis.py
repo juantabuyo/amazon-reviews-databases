@@ -25,28 +25,26 @@ def get_categories():
             return [row[0] for row in cursor.fetchall()]
 
 def get_top_users(conn, n=TOP_N_USERS):
-    cursor = conn.cursor()
-    sql = """
-        SELECT reviewerID, COUNT(*) AS total
-        FROM reviews
-        GROUP BY reviewerID
-        ORDER BY total DESC, reviewerID ASC
-        LIMIT %s
-    """
-    cursor.execute(sql, (n,))
-    users = [row[0] for row in cursor.fetchall()]
-    cursor.close()
-    return users
+    with closing(conn.cursor()) as cursor:
+        sql = """
+            SELECT reviewerID, COUNT(*) AS total
+            FROM reviews
+            GROUP BY reviewerID
+            ORDER BY total DESC, reviewerID ASC
+            LIMIT %s
+        """
+        cursor.execute(sql, (n,))
+        users = [row[0] for row in cursor.fetchall()]
+        return users
 
 def get_user_ratings(conn, reviewer_id):
     """
 Average non-null review events per user/item pair; SQL order cannot choose an arbitrary rating."""
-    cursor = conn.cursor()
-    sql = 'SELECT asin, AVG(overall) FROM reviews WHERE reviewerID = %s AND overall IS NOT NULL GROUP BY asin ORDER BY asin'
-    cursor.execute(sql, (reviewer_id,))
-    ratings = {row[0]: float(row[1]) for row in cursor.fetchall()}
-    cursor.close()
-    return ratings
+    with closing(conn.cursor()) as cursor:
+        sql = 'SELECT asin, AVG(overall) FROM reviews WHERE reviewerID = %s AND overall IS NOT NULL GROUP BY asin ORDER BY asin'
+        cursor.execute(sql, (reviewer_id,))
+        ratings = {row[0]: float(row[1]) for row in cursor.fetchall()}
+        return ratings
 
 def pearson_correlation(ratings_u, ratings_v):
     """Calculate the submitted centred similarity on shared items.
@@ -151,34 +149,32 @@ def choose_category():
 
 def get_random_items(conn, category, n):
     """Sample items reproducibly when the caller seeds random."""
-    cursor = conn.cursor()
-    sql = """
-        SELECT DISTINCT asin
-        FROM reviews
-        WHERE categoria = %s
-        ORDER BY asin
-    """
-    cursor.execute(sql, (category,))
-    all_items = [row[0] for row in cursor.fetchall()]
-    cursor.close()
-    if len(all_items) < n:
-        print(f'There are only {len(all_items)} items in {category}; all will be used')
-        return all_items
-    return random.sample(all_items, n)
+    with closing(conn.cursor()) as cursor:
+        sql = """
+            SELECT DISTINCT asin
+            FROM reviews
+            WHERE categoria = %s
+            ORDER BY asin
+        """
+        cursor.execute(sql, (category,))
+        all_items = [row[0] for row in cursor.fetchall()]
+        if len(all_items) < n:
+            print(f'There are only {len(all_items)} items in {category}; all will be used')
+            return all_items
+        return random.sample(all_items, n)
 
 def get_item_ratings(conn, asin):
     """Return one row per user/item, with mean rating and latest known event timestamp."""
-    cursor = conn.cursor()
-    sql = """
-        SELECT reviewerID, AVG(overall), MAX(unixReviewTime)
-        FROM reviews
-        WHERE asin = %s AND overall IS NOT NULL
-        GROUP BY reviewerID ORDER BY reviewerID
-    """
-    cursor.execute(sql, (asin,))
-    results = cursor.fetchall()
-    cursor.close()
-    return results
+    with closing(conn.cursor()) as cursor:
+        sql = """
+            SELECT reviewerID, AVG(overall), MAX(unixReviewTime)
+            FROM reviews
+            WHERE asin = %s AND overall IS NOT NULL
+            GROUP BY reviewerID ORDER BY reviewerID
+        """
+        cursor.execute(sql, (asin,))
+        results = cursor.fetchall()
+        return results
 
 def load_items_and_users(driver, item_data):
     """Write items, users and their aggregated ratings into an empty demo graph."""
@@ -223,32 +219,30 @@ def random_items_option():
 
 def get_multi_category_users(conn, n_users=400):
     """Inspect the first n users by name and retain those reviewing two or more categories."""
-    cursor = conn.cursor()
-    sql = """
-        SELECT reviewerID
-        FROM usuarios
-        ORDER BY reviewerName, reviewerID
-        LIMIT %s
-    """
-    cursor.execute(sql, (n_users,))
-    user_ids = [row[0] for row in cursor.fetchall()]
-    if not user_ids:
-        cursor.close()
-        return {}
-    result = {}
-    placeholders = ','.join(['%s'] * len(user_ids))
-    sql = f'\n        SELECT reviewerID, categoria, COUNT(DISTINCT asin) AS total\n        FROM reviews\n        WHERE reviewerID IN ({placeholders})\n        GROUP BY reviewerID, categoria\n    '
-    cursor.execute(sql, user_ids)
-    data_by_user = {}
-    for rid, cat, total in cursor.fetchall():
-        if rid not in data_by_user:
-            data_by_user[rid] = {}
-        data_by_user[rid][cat] = total
-    cursor.close()
-    for rid, cats in data_by_user.items():
-        if len(cats) >= 2:
-            result[rid] = cats
-    return result
+    with closing(conn.cursor()) as cursor:
+        sql = """
+            SELECT reviewerID
+            FROM usuarios
+            ORDER BY reviewerName, reviewerID
+            LIMIT %s
+        """
+        cursor.execute(sql, (n_users,))
+        user_ids = [row[0] for row in cursor.fetchall()]
+        if not user_ids:
+            return {}
+        result = {}
+        placeholders = ','.join(['%s'] * len(user_ids))
+        sql = f'\n        SELECT reviewerID, categoria, COUNT(DISTINCT asin) AS total\n        FROM reviews\n        WHERE reviewerID IN ({placeholders})\n        GROUP BY reviewerID, categoria\n    '
+        cursor.execute(sql, user_ids)
+        data_by_user = {}
+        for rid, cat, total in cursor.fetchall():
+            if rid not in data_by_user:
+                data_by_user[rid] = {}
+            data_by_user[rid][cat] = total
+        for rid, cats in data_by_user.items():
+            if len(cats) >= 2:
+                result[rid] = cats
+        return result
 
 def load_users_and_categories(driver, user_categories):
     """Write users, categories and distinct-item counts into an empty demo graph."""
@@ -280,35 +274,33 @@ def multi_category_option():
 
 def get_popular_items(conn, top=5, max_reviews=40):
     """Return the most-reviewed items below the submitted max-review threshold."""
-    cursor = conn.cursor()
-    sql = """
-        SELECT asin, COUNT(*) AS total
-        FROM reviews
-        GROUP BY asin
-        HAVING total < %s
-        ORDER BY total DESC, asin ASC
-        LIMIT %s
-    """
-    cursor.execute(sql, (max_reviews, top))
-    items = [row[0] for row in cursor.fetchall()]
-    cursor.close()
-    return items
+    with closing(conn.cursor()) as cursor:
+        sql = """
+            SELECT asin, COUNT(*) AS total
+            FROM reviews
+            GROUP BY asin
+            HAVING total < %s
+            ORDER BY total DESC, asin ASC
+            LIMIT %s
+        """
+        cursor.execute(sql, (max_reviews, top))
+        items = [row[0] for row in cursor.fetchall()]
+        return items
 
 def get_item_users(conn, items):
     """Return distinct users per item and sets of items per user."""
-    cursor = conn.cursor()
-    item_users = {}
-    user_items = {}
-    for asin in items:
-        cursor.execute('SELECT DISTINCT reviewerID FROM reviews WHERE asin = %s ORDER BY reviewerID', (asin,))
-        users = [row[0] for row in cursor.fetchall()]
-        item_users[asin] = users
-        for uid in users:
-            if uid not in user_items:
-                user_items[uid] = set()
-            user_items[uid].add(asin)
-    cursor.close()
-    return (item_users, user_items)
+    with closing(conn.cursor()) as cursor:
+        item_users = {}
+        user_items = {}
+        for asin in items:
+            cursor.execute('SELECT DISTINCT reviewerID FROM reviews WHERE asin = %s ORDER BY reviewerID', (asin,))
+            users = [row[0] for row in cursor.fetchall()]
+            item_users[asin] = users
+            for uid in users:
+                if uid not in user_items:
+                    user_items[uid] = set()
+                user_items[uid].add(asin)
+        return (item_users, user_items)
 
 def load_popular_items(driver, items, item_users, user_items):
     """Write popular items and the number of items shared by each user pair."""
