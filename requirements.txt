@@ -1,0 +1,6 @@
+# Versions imported and checked with Python 3.12.14; live DB servers not tested.
+PyMySQL==1.2.3
+pymongo==4.19.0
+neo4j==6.4.1
+matplotlib==3.10.8
+wordcloud==1.9.6
